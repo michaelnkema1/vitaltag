@@ -45,7 +45,10 @@ src/
     actions/                      Server Actions: auth.ts, passport.ts
     supabase/                     client.ts, server.ts, middleware.ts, types.ts
   proxy.ts                        session refresh + route guard
-supabase/migrations/0001_init.sql  schema, RLS, RPCs, triggers
+supabase/migrations/
+  0001_init.sql                    schema, RLS, RPCs, triggers
+  0002_fix_profiles_rls_recursion.sql  fixes infinite-recursion RLS bug
+  0003_passports_unique_user.sql   one passport per user
 ```
 
 ## Design system
@@ -58,21 +61,25 @@ supabase/migrations/0001_init.sql  schema, RLS, RPCs, triggers
 
 ## Status
 
-**Open bug:** creating a passport on `/dashboard` silently fails — no
-passport, no error. Not root-caused yet; check the browser Network/Console
-tabs next.
+**Fixed:** passport creation was broken by a self-referencing RLS policy on
+`profiles` (any query touching it hit Postgres error 42P17, infinite
+recursion) — see `0002`. The masked read error let ~60 duplicate passport
+rows get silently created before `0003` added a unique constraint.
 
 **Not built:** Tier 2 write UI, pharmacy module, camera QR scan,
 admin-gated clinician signup, realtime sync, PWA icons, tests.
 
 **Known issues:** `check_allergy_contraindication` RPC has no
 caller-authorization check (any user can query any passport's allergies) ·
-`passports.user_id` has no unique constraint · `lucide-react`/`zod`
-installed but unused · `Logo.tsx` unused.
+`lucide-react`/`zod` installed but unused · `Logo.tsx` unused.
 
 ## Conventions
 
 - Mutations are Server Actions (`lib/actions/`), not API routes.
 - Schema changes are new migration files — never edit `0001_init.sql`.
 - On failure, redirect with `?error=` — a thrown error in a form action has
-  no visible UI feedback.
+  no visible UI feedback, and never swallow a read error either (that's
+  what caused the duplicate-rows incident).
+- Never subquery a table from within its own RLS policy, or another
+  policy that subqueries it — use a `SECURITY DEFINER` function instead
+  (see `is_clinician()`).

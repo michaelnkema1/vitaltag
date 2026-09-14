@@ -21,11 +21,25 @@ export default async function DashboardPage({
 
   if (!user) return null; // middleware already redirects unauthenticated users
 
-  const { data: passport } = await supabase
+  const { data: passport, error: passportError } = await supabase
     .from("passports")
     .select("*")
     .eq("user_id", user.id)
     .maybeSingle();
+
+  // Never treat a failed read as "no passport yet" -- that mismatch is
+  // exactly what let a masked RLS error cause dozens of duplicate rows
+  // to get created silently. Surface it instead.
+  if (passportError) {
+    return (
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-6 py-16">
+        <h1 className="text-2xl font-bold">Couldn&apos;t load your passport</h1>
+        <p className="rounded-md bg-emergency-warn-bg px-3 py-2 text-sm text-emergency-fg">
+          {passportError.message}
+        </p>
+      </main>
+    );
+  }
 
   if (!passport) {
     return (

@@ -29,6 +29,25 @@ create table profiles (
 
 alter table profiles enable row level security;
 
+-- SECURITY DEFINER so this bypasses RLS internally: a policy that
+-- subqueries profiles directly from within profiles' own policy (or from
+-- another table's clinician-read policy) makes Postgres's RLS planner
+-- recurse indefinitely (error 42P17, "infinite recursion detected in
+-- policy"). Routing the check through this function breaks the cycle.
+create or replace function is_clinician()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from profiles where id = auth.uid() and role in ('clinician', 'admin')
+  );
+$$;
+
+grant execute on function is_clinician() to authenticated;
+
 create policy "profiles: read own" on profiles
   for select using (auth.uid() = id);
 
@@ -36,12 +55,7 @@ create policy "profiles: update own" on profiles
   for update using (auth.uid() = id);
 
 create policy "profiles: clinicians read all" on profiles
-  for select using (
-    exists (
-      select 1 from profiles me
-      where me.id = auth.uid() and me.role in ('clinician', 'admin')
-    )
-  );
+  for select using (is_clinician());
 
 -- ---------------------------------------------------------------------------
 -- passports: the cloud-linked VitalTag pass. qr_token is the sole value
@@ -51,7 +65,7 @@ create policy "profiles: clinicians read all" on profiles
 
 create table passports (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles (id) on delete cascade,
+  user_id uuid not null unique references profiles (id) on delete cascade,
   qr_token uuid not null unique default gen_random_uuid(),
   blood_group text not null check (blood_group in ('O+','O-','A+','A-','B+','B-','AB+','AB-','unknown')),
   weight_kg numeric(5,2),
@@ -69,12 +83,7 @@ create policy "passports: owner full access" on passports
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "passports: clinicians read" on passports
-  for select using (
-    exists (
-      select 1 from profiles me
-      where me.id = auth.uid() and me.role in ('clinician', 'admin')
-    )
-  );
+  for select using (is_clinician());
 
 -- ---------------------------------------------------------------------------
 -- Tier 1 data: allergies, chronic conditions, ICE contacts.
@@ -137,9 +146,7 @@ begin
 
     execute format($f$
       create policy "%1$s: clinicians read" on %1$s
-        for select using (
-          exists (select 1 from profiles me where me.id = auth.uid() and me.role in ('clinician', 'admin'))
-        );
+        for select using (is_clinician());
     $f$, t);
   end loop;
 end $$;
@@ -168,11 +175,7 @@ create index clinical_records_passport_id_idx on clinical_records (passport_id);
 alter table clinical_records enable row level security;
 
 create policy "clinical_records: clinicians only" on clinical_records
-  for all using (
-    exists (select 1 from profiles me where me.id = auth.uid() and me.role in ('clinician', 'admin'))
-  ) with check (
-    exists (select 1 from profiles me where me.id = auth.uid() and me.role in ('clinician', 'admin'))
-  );
+  for all using (is_clinician()) with check (is_clinician());
 
 -- ---------------------------------------------------------------------------
 -- access_audit_log: every scan, tier 1 or tier 2, is logged. Tier 1 scans
@@ -198,9 +201,7 @@ create policy "access_audit_log: owner reads own" on access_audit_log
   );
 
 create policy "access_audit_log: clinicians read" on access_audit_log
-  for select using (
-    exists (select 1 from profiles me where me.id = auth.uid() and me.role in ('clinician', 'admin'))
-  );
+  for select using (is_clinician());
 
 -- ---------------------------------------------------------------------------
 -- Pharmacy network + post-triage medication holds
@@ -242,9 +243,7 @@ create policy "medication_holds: owner full access" on medication_holds
   );
 
 create policy "medication_holds: clinicians read" on medication_holds
-  for select using (
-    exists (select 1 from profiles me where me.id = auth.uid() and me.role in ('clinician', 'admin'))
-  );
+  for select using (is_clinician());
 
 -- ---------------------------------------------------------------------------
 -- get_emergency_snapshot: the ONLY path to Tier 1 data for anonymous
