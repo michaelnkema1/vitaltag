@@ -1,75 +1,78 @@
 # VitalTag
 
-Dynamic emergency medical passport and clinical triage infrastructure. See
-`VitalTag_Executive_Proposal_HatchPoint.docx` for the full product proposal.
+Emergency medical passport. Scan a QR with no login → get crash data
+(blood group, allergies, conditions, ICE contacts). Authenticated
+clinicians get the full clinical record. QR encodes only a random token,
+never medical data. Full proposal: `VitalTag_Executive_Proposal_HatchPoint.docx`.
 
 ## Stack
 
-- **Next.js (App Router, TypeScript)** — single responsive app serving three
-  surfaces: the public emergency scan view, the patient dashboard, and the
-  hospital terminal.
-- **Supabase** — Postgres, Auth (JWT), Realtime, and Row Level Security.
-  RLS enforces the proposal's two-tier access model directly at the database
-  layer rather than in application code.
-- **Tailwind CSS v4** for styling.
+Next.js 16 (App Router, TypeScript) + Supabase (Postgres, Auth, RLS,
+Realtime) + Tailwind v4.
 
-## Two-tier access model
+## Access model
 
 | Tier | Who | How |
 |---|---|---|
-| 1 — Emergency crash data | Anyone with the QR token, no login | `get_emergency_snapshot(token)` — a `SECURITY DEFINER` Postgres function that returns only blood group, allergies, chronic conditions, and ICE contacts, and writes an audit log row on every call. There is no RLS grant that exposes this data directly; the function is the only door. |
-| 2 — Full clinical ledger | Authenticated clinicians | Row Level Security on `clinical_records` checks `profiles.role in ('clinician', 'admin')`. |
+| 1 — Crash data | Anyone with the QR token | `get_emergency_snapshot()` RPC, logs every call |
+| 2 — Full ledger | Clinicians / admins, authenticated | RLS on `clinical_records` |
 
-The QR code printed on a card / shown in the app encodes only a random
-`qr_token` (see `passports.qr_token` in the schema) — never medical data
-itself, per the "zero-data ephemeral pointer" architecture in the proposal.
+## Setup
+
+**Don't create a new Supabase project — this uses a shared one.** Ask the
+project owner for the URL + anon key, then:
+
+```bash
+cp .env.local.example .env.local   # paste in the two values you were given
+npm install
+npm run dev
+```
+
+Schema's already applied there. Adding a migration? Tell the owner so it
+gets run on the shared project too.
 
 ## Project layout
 
 ```
 src/
   app/
-    page.tsx                 landing page
-    login/, signup/           auth forms (Server Actions)
-    dashboard/                patient: manage passport, allergies, ICE contacts
-    terminal/                 hospital: Tier 2 lookup + allergy contraindication check
-    emergency/[token]/        public Tier 1 scan view (no auth)
+    page.tsx, login/, signup/     redesigned (brand styling)
+    dashboard/, terminal/,
+    emergency/[token]/            NOT redesigned (raw defaults)
+    globals.css                   brand tokens + self-hosted Fraunces
+  components/                     SiteHeader/Footer, PassportQr, PassportCardMock
   lib/
-    actions/                  Server Actions (auth.ts, passport.ts)
-    supabase/                 client.ts (browser), server.ts (RSC/actions),
-                               middleware.ts (session refresh + route guard),
-                               types.ts (hand-written DB types)
-  middleware.ts                wires supabase/middleware.ts into Next.js
-supabase/
-  migrations/0001_init.sql     full schema, RLS policies, RPC functions
-  config.toml                  local Supabase CLI config
+    actions/                      Server Actions: auth.ts, passport.ts
+    supabase/                     client.ts, server.ts, middleware.ts, types.ts
+  proxy.ts                        session refresh + route guard
+supabase/migrations/0001_init.sql  schema, RLS, RPCs, triggers
 ```
 
-## Setup
+## Design system
 
-1. Install dependencies: `npm install`
-2. Create a Supabase project (or run `supabase start` locally with the
-   [Supabase CLI](https://supabase.com/docs/guides/cli)).
-3. Apply the schema: `supabase db push` (or paste
-   `supabase/migrations/0001_init.sql` into the SQL editor).
-4. Copy `.env.local.example` to `.env.local` and fill in your project's URL
-   and anon key.
-5. `npm run dev` and open http://localhost:3000.
+- Brand colors: myrtle `#217868` (text/buttons) on cream `#E5DABE` (bg) —
+  tokens in `globals.css`.
+- Fraunces (display font) is self-hosted in `public/fonts/`, not
+  `next/font/google` — that path had an intermittent Turbopack bug.
+- Only `/`, `/login`, `/signup` are redesigned so far.
 
-Regenerate typed DB bindings once a project is linked (replaces the
-hand-written `src/lib/supabase/types.ts`):
+## Status
 
-```bash
-npx supabase gen types typescript --linked > src/lib/supabase/types.ts
-```
+**Open bug:** creating a passport on `/dashboard` silently fails — no
+passport, no error. Not root-caused yet; check the browser Network/Console
+tabs next.
 
-## Known gaps (MVP scaffold, not yet built)
+**Not built:** Tier 2 write UI, pharmacy module, camera QR scan,
+admin-gated clinician signup, realtime sync, PWA icons, tests.
 
-- Signup lets anyone self-select the `clinician` role for demo purposes —
-  production needs admin-gated clinician provisioning.
-- QR scanning on the terminal is a paste/type field, not a camera scanner.
-- Pharmacy telemetry (Module 4) has schema (`pharmacies`,
-  `medication_holds`) but no UI yet.
-- PWA manifest references `/icon-192.png` and `/icon-512.png`, which don't
-  exist yet — add real app icons before shipping installability.
-- No automated tests yet.
+**Known issues:** `check_allergy_contraindication` RPC has no
+caller-authorization check (any user can query any passport's allergies) ·
+`passports.user_id` has no unique constraint · `lucide-react`/`zod`
+installed but unused · `Logo.tsx` unused.
+
+## Conventions
+
+- Mutations are Server Actions (`lib/actions/`), not API routes.
+- Schema changes are new migration files — never edit `0001_init.sql`.
+- On failure, redirect with `?error=` — a thrown error in a form action has
+  no visible UI feedback.
