@@ -24,7 +24,7 @@ export async function signUp(formData: FormData) {
   const role = String(formData.get("role") || "patient");
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -34,6 +34,12 @@ export async function signUp(formData: FormData) {
 
   if (error) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`);
+  }
+
+  // If email confirmation is required, signUp succeeds but returns no
+  // session -- there's no one to redirect into /dashboard yet.
+  if (!data.session) {
+    redirect(`/signup?checkEmail=${encodeURIComponent(email)}`);
   }
 
   redirect("/dashboard");

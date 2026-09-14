@@ -6,9 +6,39 @@ import { SiteHeader } from "@/components/SiteHeader";
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; checkEmail?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, checkEmail } = await searchParams;
+
+  if (checkEmail) {
+    return (
+      <>
+        <SiteHeader />
+        <main className="flex flex-1 items-center justify-center px-6 py-16">
+          <div className="w-full max-w-md space-y-5 rounded-3xl border border-brand/15 bg-background-elevated p-8 text-center shadow-[0_24px_50px_-28px_rgb(var(--shadow-color)/0.4)]">
+            <p className="text-xs font-semibold tracking-[0.24em] uppercase">
+              Almost there
+            </p>
+            <h1 className="font-display text-3xl font-semibold">
+              Check your email
+            </h1>
+            <p className="text-sm leading-relaxed text-brand/70">
+              We sent a confirmation link to{" "}
+              <span className="font-semibold text-brand">{checkEmail}</span>.
+              Click it to activate your account, then log in below.
+            </p>
+            <Link
+              href="/login"
+              className="inline-block w-full rounded-full bg-brand py-3 font-semibold text-cream transition hover:bg-brand-dark"
+            >
+              Go to log in
+            </Link>
+          </div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
 
   return (
     <>
