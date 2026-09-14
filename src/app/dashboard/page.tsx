@@ -8,7 +8,12 @@ import {
 } from "@/lib/actions/passport";
 import { PassportQr } from "@/components/PassportQr";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error: actionError } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -30,6 +35,11 @@ export default async function DashboardPage() {
           This creates your emergency crash-data record and issues a QR
           pointer token for your card.
         </p>
+        {actionError && (
+          <p className="rounded-md bg-emergency-warn-bg px-3 py-2 text-sm text-emergency-fg">
+            {actionError}
+          </p>
+        )}
         <form action={createPassport} className="space-y-4">
           <div className="space-y-1">
             <label htmlFor="blood_group" className="text-sm font-medium">
@@ -82,6 +92,11 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 space-y-10 px-6 py-12">
+      {actionError && (
+        <p className="rounded-md bg-emergency-warn-bg px-3 py-2 text-sm text-emergency-fg">
+          {actionError}
+        </p>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Your VitalTag passport</h1>
         <form action={signOut}>

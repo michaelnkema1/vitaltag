@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { BloodGroup } from "@/lib/supabase/types";
@@ -13,6 +14,16 @@ async function requireUserId() {
   return { supabase, userId: user.id };
 }
 
+// Server Actions bound directly to a <form action={...}> have no client-side
+// catch: a thrown error just fails the request with no visible feedback, and
+// on the create-passport form specifically, a failed insert re-renders the
+// exact same "set up your passport" form -- indistinguishable from success
+// having silently done nothing. Route every failure back through a visible
+// ?error= banner on /dashboard instead of throwing.
+function failDashboard(message: string): never {
+  redirect(`/dashboard?error=${encodeURIComponent(message)}`);
+}
+
 export async function createPassport(formData: FormData) {
   const { supabase, userId } = await requireUserId();
   const blood_group = String(formData.get("blood_group")) as BloodGroup;
@@ -21,7 +32,7 @@ export async function createPassport(formData: FormData) {
     .from("passports")
     .insert({ user_id: userId, blood_group });
 
-  if (error) throw new Error(error.message);
+  if (error) failDashboard(error.message);
   revalidatePath("/dashboard");
 }
 
@@ -38,7 +49,7 @@ export async function addAllergy(formData: FormData) {
     .from("allergies")
     .insert({ passport_id, substance, severity });
 
-  if (error) throw new Error(error.message);
+  if (error) failDashboard(error.message);
   revalidatePath("/dashboard");
 }
 
@@ -51,7 +62,7 @@ export async function addChronicCondition(formData: FormData) {
     .from("chronic_conditions")
     .insert({ passport_id, condition_name });
 
-  if (error) throw new Error(error.message);
+  if (error) failDashboard(error.message);
   revalidatePath("/dashboard");
 }
 
@@ -66,6 +77,6 @@ export async function addIceContact(formData: FormData) {
     .from("ice_contacts")
     .insert({ passport_id, name, relationship, phone });
 
-  if (error) throw new Error(error.message);
+  if (error) failDashboard(error.message);
   revalidatePath("/dashboard");
 }
