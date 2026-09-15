@@ -1,85 +1,86 @@
 # VitalTag
 
-Emergency medical passport. Scan a QR with no login → get crash data
-(blood group, allergies, conditions, ICE contacts). Authenticated
-clinicians get the full clinical record. QR encodes only a random token,
-never medical data. Full proposal: `VitalTag_Executive_Proposal_HatchPoint.docx`.
+**Dynamic Emergency Medical Passport & Clinical Triage Infrastructure**
 
-## Stack
+VitalTag is a dynamic emergency medical identity system designed to conquer the critical **'Golden Hour'** in acute healthcare delivery. It provides first responders with 2-second access to verified crash data (blood group, severe allergies, chronic conditions, emergency ICE contacts) without requiring a login or exposing personal health identifiers (PHI) on the physical card/QR code. Authenticated clinicians gain access to the full Tier 2 clinical ledger and contraindication cross-check engine.
 
-Next.js 16 (App Router, TypeScript) + Supabase (Postgres, Auth, RLS,
-Realtime) + Tailwind v4.
+Full proposal spec: `VitalTag_Executive_Proposal_HatchPoint.docx`.
 
-## Access model
+---
 
-| Tier | Who | How |
-|---|---|---|
-| 1 — Crash data | Anyone with the QR token | `get_emergency_snapshot()` RPC, logs every call |
-| 2 — Full ledger | Clinicians / admins, authenticated | RLS on `clinical_records` |
+## 🛠️ Stack
 
-## Setup
+* **Framework**: Next.js 16.3.5 (App Router, TypeScript)
+* **Database & Auth**: Supabase (PostgreSQL, Supabase Auth with `@supabase/ssr`, RLS policies, Realtime, PL/pgSQL RPCs)
+* **Styling & Design System**: Tailwind CSS v4 (`globals.css`) + self-hosted variable *Fraunces* display font
+* **Icons & QR**: `lucide-react`, `qrcode.react`, native `BarcodeDetector` API
 
-**Don't create a new Supabase project — this uses a shared one.** Ask the
-project owner for the URL + anon key, then:
+---
 
-```bash
-cp .env.local.example .env.local   # paste in the two values you were given
-npm install
-npm run dev
-```
+## 🔐 Access Model
 
-Schema's already applied there. Adding a migration? Tell the owner so it
-gets run on the shared project too.
+| Access Tier | Target User | Authentication | Accessible Data |
+|---|---|---|---|
+| **Tier 1 — Crash Data** | EMTs, First Responders, Public | **Zero Login** (Scanned QR pointer token) | `get_emergency_snapshot()` RPC: Blood group, severe allergies, chronic alerts, priority ICE contacts with 1-click calling. Logged in `access_audit_log`. |
+| **Tier 2 — Full Ledger** | Hospital Clinicians & Admins | **Authenticated** (Role-Based RLS) | `clinical_records` table: Doctor notes, active prescriptions, complete diagnosis history, national health ID, and allergy contraindication cross-check. |
 
-## Project layout
+---
 
-```
-src/
-  app/
-    page.tsx, login/, signup/     redesigned (brand styling)
-    dashboard/, terminal/,
-    emergency/[token]/            NOT redesigned (raw defaults)
-    globals.css                   brand tokens + self-hosted Fraunces
-  components/                     SiteHeader/Footer, PassportQr, PassportCardMock
-  lib/
-    actions/                      Server Actions: auth.ts, passport.ts
-    supabase/                     client.ts, server.ts, middleware.ts, types.ts
-  proxy.ts                        session refresh + route guard
-supabase/migrations/
-  0001_init.sql                    schema, RLS, RPCs, triggers
-  0002_fix_profiles_rls_recursion.sql  fixes infinite-recursion RLS bug
-  0003_passports_unique_user.sql   one passport per user
-```
+## 🚀 Quick Demo Accounts
 
-## Design system
+The database includes pre-seeded demo accounts for instant workflow evaluation (accessible directly via 1-click buttons on `/login`):
 
-- Brand colors: myrtle `#217868` (text/buttons) on cream `#E5DABE` (bg) —
-  tokens in `globals.css`.
-- Fraunces (display font) is self-hosted in `public/fonts/`, not
-  `next/font/google` — that path had an intermittent Turbopack bug.
-- Only `/`, `/login`, `/signup` are redesigned so far.
+| Role | Email | Password | Details & Pre-loaded Data |
+|---|---|---|---|
+| 🩺 **Clinician Demo** | `clinician@vitaltag.demo` | `Password123!` | Role: `clinician` (Dr. Sarah Jenkins). Access to Tier 2 hospital terminal, full ledger editing, and contraindication engine. |
+| 👤 **Patient Demo** | `patient@vitaltag.demo` | `Password123!` | Role: `patient` (John Doe). Pre-loaded Blood Group `O+`, severe Penicillin allergy, Asthma, Diabetes, ICE contacts, and fixed QR Token: `11111111-1111-1111-1111-111111111111`. |
 
-## Status
+---
 
-**Fixed:** passport creation was broken by a self-referencing RLS policy on
-`profiles` (any query touching it hit Postgres error 42P17, infinite
-recursion) — see `0002`. The masked read error let ~60 duplicate passport
-rows get silently created before `0003` added a unique constraint.
+## ⚡ Quick Start
 
-**Not built:** Tier 2 write UI, pharmacy module, camera QR scan,
-admin-gated clinician signup, realtime sync, PWA icons, tests.
+1. **Environment Configuration**:
+   Copy `.env.local.example` to `.env.local` and configure your Supabase URL & Anon Key:
+   ```bash
+   cp .env.local.example .env.local
+   ```
 
-**Known issues:** `check_allergy_contraindication` RPC has no
-caller-authorization check (any user can query any passport's allergies) ·
-`lucide-react`/`zod` installed but unused · `Logo.tsx` unused.
+2. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
-## Conventions
+3. **Run Development Server**:
+   ```bash
+   npm run dev
+   ```
+   Open `http://localhost:3000` in your browser.
 
-- Mutations are Server Actions (`lib/actions/`), not API routes.
-- Schema changes are new migration files — never edit `0001_init.sql`.
-- On failure, redirect with `?error=` — a thrown error in a form action has
-  no visible UI feedback, and never swallow a read error either (that's
-  what caused the duplicate-rows incident).
-- Never subquery a table from within its own RLS policy, or another
-  policy that subqueries it — use a `SECURITY DEFINER` function instead
-  (see `is_clinician()`).
+4. **Build & Verify Production Bundle**:
+   ```bash
+   npm run build
+   ```
+
+---
+
+## ✅ Feature Implementation Status
+
+- [x] **Zero-Data QR ephemerality**: Physical cards contain only a random 128-bit UUID pointer token.
+- [x] **Tier 1 Emergency Crash Interface**: Public `/emergency/[token]` route with 1-click ICE dialing.
+- [x] **Tier 2 Hospital Triage Terminal**: `/terminal` route with full clinical record writing (doctor notes, prescriptions, diagnosis history).
+- [x] **Multi-Format Triage Search**: Terminal search accepts QR tokens, 128-bit UUIDs, National Health IDs (e.g., `NHID-99482-GH`), or Patient Names (`John Doe`).
+- [x] **Browser Camera QR Code Scanner**: Native `BarcodeDetector` integration in `QrScanner.tsx` for scanning cards directly.
+- [x] **Algorithmic Contraindication Cross-Check**: `check_allergy_contraindication` RPC flags drug-allergy conflicts in real-time.
+- [x] **Session & Role-Aware Navigation**: Header updates dynamically with role badges (`Clinician` / `Patient`) and shortcuts.
+- [x] **Hydration-Safe QR Component**: Solved SSR vs Client URL hydration mismatch in `PassportQr.tsx`.
+- [ ] **Module 4 Pharmacy Network & Medication Holds**: Schema ready (`pharmacies`, `medication_holds`); UI reservation flow pending.
+- [ ] **Patient Access Audit History UI**: Backend audit table (`access_audit_log`) active; patient dashboard UI history log pending.
+
+---
+
+## 📝 Conventions & Rules
+
+- **Server Actions**: All mutations use Server Actions (`lib/actions/`), never API routes.
+- **Error Redirects**: Failures redirect to `?error=` query parameters to ensure visible UI feedback instead of silent form crashes.
+- **RLS Safety**: Never subquery `profiles` within its own policy — always use `SECURITY DEFINER` functions like `is_clinician()` to avoid Postgres recursion error `42P17`.
+- **Migrations**: New database changes must be added as sequential migration files (`supabase/migrations/`).
