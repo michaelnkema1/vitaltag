@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Camera, X, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface QrScannerProps {
-  onScan: (token: string) => void;
+  onScan?: (token: string) => void;
+  redirectPath?: string;
 }
 
-export function QrScanner({ onScan }: QrScannerProps) {
+export function QrScanner({ onScan, redirectPath = "/terminal" }: QrScannerProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -52,6 +55,15 @@ export function QrScanner({ onScan }: QrScannerProps) {
     setIsOpen(false);
   };
 
+  const handleScannedToken = (token: string) => {
+    if (onScan) {
+      onScan(token);
+    } else {
+      router.push(`${redirectPath}?token=${encodeURIComponent(token)}`);
+    }
+    handleClose();
+  };
+
   const detectQr = () => {
     if (!videoRef.current) return;
 
@@ -67,8 +79,7 @@ export function QrScanner({ onScan }: QrScannerProps) {
             const rawValue = barcodes[0].rawValue;
             // Extract token UUID if full URL was scanned
             const matchedToken = rawValue.match(/[0-9a-fA-F-]{36}/)?.[0] || rawValue;
-            onScan(matchedToken);
-            handleClose();
+            handleScannedToken(matchedToken);
             return;
           }
         } catch {
@@ -78,7 +89,6 @@ export function QrScanner({ onScan }: QrScannerProps) {
       };
       animFrameRef.current = requestAnimationFrame(scanLoop);
     } else {
-      // BarcodeDetector fallback note
       setError("Native barcode scanner not supported in this browser. Paste token or use modern Chrome/Edge/Safari.");
     }
   };

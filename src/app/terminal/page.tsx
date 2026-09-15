@@ -15,13 +15,17 @@ import {
   Stethoscope,
 } from "lucide-react";
 
+const isUuid = (str: string) =>
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
+
 export default async function TerminalPage({
   searchParams,
 }: {
   searchParams: Promise<{ token?: string; med?: string; error?: string; saved?: string }>;
 }) {
-  const { token, med, error, saved } = await searchParams;
+  const { token, med, error: queryError, saved } = await searchParams;
   const supabase = await createClient();
+  let searchError: string | null = queryError ?? null;
 
   const {
     data: { user },
@@ -53,7 +57,7 @@ export default async function TerminalPage({
     );
   }
 
-  let passport: { id: string; blood_group: string; national_health_id: string | null } | null = null;
+  let passport: { id: string; blood_group: string; national_health_id: string | null; qr_token: string } | null = null;
   let allergies: { substance: string; severity: string; reaction_notes: string | null }[] = [];
   let conditions: { condition_name: string; notes: string | null }[] = [];
   let contacts: { name: string; relationship: string; phone: string }[] = [];
@@ -64,37 +68,84 @@ export default async function TerminalPage({
   } | null = null;
   let contraindications: { substance: string; severity: string; reaction_notes: string | null }[] = [];
 
-  if (token) {
-    const { data: p } = await supabase
-      .from("passports")
-      .select("id, blood_group, national_health_id")
-      .eq("qr_token", token)
-      .maybeSingle();
-    passport = p;
+  const queryTerm = token?.trim();
 
-    if (passport) {
-      const [{ data: a }, { data: c }, { data: ic }, { data: cr }] = await Promise.all([
-        supabase.from("allergies").select("*").eq("passport_id", passport.id),
-        supabase.from("chronic_conditions").select("*").eq("passport_id", passport.id),
-        supabase.from("ice_contacts").select("*").eq("passport_id", passport.id),
-        supabase
-          .from("clinical_records")
-          .select("*")
-          .eq("passport_id", passport.id)
-          .maybeSingle(),
-      ]);
-      allergies = a ?? [];
-      conditions = c ?? [];
-      contacts = ic ?? [];
-      clinicalRecord = cr;
+  if (queryTerm) {
+    try {
+      let p: { id: string; blood_group: string; national_health_id: string | null; qr_token: string } | null = null;
 
-      if (med) {
-        const { data: flagged } = await supabase.rpc("check_allergy_contraindication", {
-          p_passport_id: passport.id,
-          p_medication: med,
-        });
-        contraindications = flagged ?? [];
+      // 1. If valid UUID format, query directly by qr_token or passport id
+      if (isUuid(queryTerm)) {
+        const { data } = await supabase
+          .from("passports")
+          .select("id, blood_group, national_health_id, qr_token")
+          .or(`qr_token.eq.${queryTerm},id.eq.${queryTerm}`)
+          .maybeSingle();
+        p = data;
       }
+
+      // 2. Fallback: Search by National Health ID (case-insensitive)
+      if (!p) {
+        const { data: byNhid } = await supabase
+          .from("passports")
+          .select("id, blood_group, national_health_id, qr_token")
+          .ilike("national_health_id", `%${queryTerm}%`)
+          .maybeSingle();
+        p = byNhid;
+      }
+
+      // 3. Fallback: Search by Patient Full Name in profiles
+      if (!p) {
+        const { data: matchingProfile } = await supabase
+          .from("profiles")
+          .select("id")
+          .ilike("full_name", `%${queryTerm}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (matchingProfile) {
+          const { data: byProfile } = await supabase
+            .from("passports")
+            .select("id, blood_group, national_health_id, qr_token")
+            .eq("user_id", matchingProfile.id)
+            .maybeSingle();
+          p = byProfile;
+        }
+      }
+
+      passport = p;
+
+      if (passport) {
+        const [{ data: a }, { data: c }, { data: ic }, { data: cr }] = await Promise.all([
+          supabase.from("allergies").select("*").eq("passport_id", passport.id),
+          supabase.from("chronic_conditions").select("*").eq("passport_id", passport.id),
+          supabase.from("ice_contacts").select("*").eq("passport_id", passport.id),
+          supabase
+            .from("clinical_records")
+            .select("*")
+            .eq("passport_id", passport.id)
+            .maybeSingle(),
+        ]);
+        allergies = a ?? [];
+        conditions = c ?? [];
+        contacts = ic ?? [];
+        clinicalRecord = cr;
+
+        if (med) {
+          const { data: flagged, error: rpcError } = await supabase.rpc("check_allergy_contraindication", {
+            p_passport_id: passport.id,
+            p_medication: med,
+          });
+          if (rpcError) {
+            console.error("Contraindication RPC error:", rpcError);
+          } else {
+            contraindications = flagged ?? [];
+          }
+        }
+      }
+    } catch (err: unknown) {
+      console.error("Terminal lookup error:", err);
+      searchError = err instanceof Error ? err.message : "Error executing passport search";
     }
   }
 
@@ -134,10 +185,10 @@ export default async function TerminalPage({
         </div>
 
         {/* Notifications */}
-        {error && (
+        {searchError && (
           <div className="rounded-2xl bg-emergency-warn-bg p-4 text-sm text-emergency-fg flex items-center gap-2 border border-emergency-accent/30">
             <AlertTriangle className="h-4 w-4 shrink-0 text-emergency-accent" />
-            <span>{error}</span>
+            <span>{searchError}</span>
           </div>
         )}
         {saved && (
@@ -150,7 +201,7 @@ export default async function TerminalPage({
         {/* Lookup Bar & Scanner */}
         <section className="rounded-3xl border border-brand/15 bg-cream p-6 shadow-sm space-y-4">
           <label htmlFor="qr-search-input" className="text-sm font-semibold tracking-wide uppercase text-brand/70 block">
-            Passport Lookup
+            Passport Triage Lookup
           </label>
           <div className="flex flex-wrap gap-3">
             <form action="/terminal" className="flex flex-1 gap-2">
@@ -159,8 +210,8 @@ export default async function TerminalPage({
                 <input
                   id="qr-search-input"
                   name="token"
-                  defaultValue={token}
-                  placeholder="Scan QR or paste 128-bit pointer token UUID..."
+                  defaultValue={queryTerm}
+                  placeholder="Scan QR token, enter National Health ID, or patient name..."
                   required
                   className="w-full rounded-2xl border border-brand/20 bg-background-elevated pl-10 pr-4 py-2.5 font-mono text-sm"
                 />
@@ -172,18 +223,20 @@ export default async function TerminalPage({
                 Look up
               </button>
             </form>
-            <QrScanner
-              onScan={(scannedToken) => {
-                window.location.href = `/terminal?token=${encodeURIComponent(scannedToken)}`;
-              }}
-            />
+            <QrScanner redirectPath="/terminal" />
           </div>
+          <p className="text-xs text-brand/60">
+            💡 Supports scanning physical QR tokens, entering 128-bit UUIDs, National Health IDs (e.g. <code>NHID-99482-GH</code>), or patient names (e.g. <code>John Doe</code>).
+          </p>
         </section>
 
-        {token && !passport && (
-          <div className="rounded-3xl border border-brand/15 bg-background-elevated p-8 text-center">
-            <p className="text-base font-semibold">No passport found for token</p>
-            <p className="mt-1 text-xs text-brand/60 font-mono">{token}</p>
+        {queryTerm && !passport && (
+          <div className="rounded-3xl border border-brand/15 bg-background-elevated p-8 text-center space-y-2">
+            <p className="text-base font-semibold text-brand">No matching patient passport found</p>
+            <p className="text-xs text-brand/60 font-mono">Searched query: &quot;{queryTerm}&quot;</p>
+            <p className="text-xs text-brand/50">
+              Verify the QR code or try searching by Patient Name or National Health ID.
+            </p>
           </div>
         )}
 
@@ -228,7 +281,7 @@ export default async function TerminalPage({
                 </h3>
               </div>
               <form action="/terminal" className="flex gap-2">
-                <input type="hidden" name="token" value={token} />
+                <input type="hidden" name="token" value={passport.qr_token} />
                 <input
                   name="med"
                   defaultValue={med}
@@ -356,7 +409,7 @@ export default async function TerminalPage({
 
               <form action={saveClinicalRecord} className="space-y-5">
                 <input type="hidden" name="passport_id" value={passport.id} />
-                <input type="hidden" name="qr_token" value={token} />
+                <input type="hidden" name="qr_token" value={passport.qr_token} />
 
                 <div className="space-y-1.5">
                   <label htmlFor="doctor_notes" className="text-xs font-semibold uppercase tracking-wider text-cream/80">
