@@ -14,6 +14,8 @@ export async function signIn(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
   }
 
+  // Redirect to dashboard where both patients and clinicians can view patient info,
+  // with role-aware options to view full clinical details or visit terminal.
   redirect("/dashboard");
 }
 
@@ -36,8 +38,6 @@ export async function signUp(formData: FormData) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`);
   }
 
-  // If email confirmation is required, signUp succeeds but returns no
-  // session -- there's no one to redirect into /dashboard yet.
   if (!data.session) {
     redirect(`/signup?checkEmail=${encodeURIComponent(email)}`);
   }
