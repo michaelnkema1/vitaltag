@@ -216,11 +216,8 @@ export default async function DashboardPage({
 
           <div className="flex items-center gap-3">
             <WalletCardPrint
-              bloodGroup={passport.blood_group}
               qrToken={passport.qr_token}
               fullName={profile?.full_name ?? "Patient"}
-              allergies={allergies ?? []}
-              contacts={contacts ?? []}
             />
 
             {isClinician && (
@@ -290,6 +287,12 @@ export default async function DashboardPage({
               <div>
                 <strong>Zero-PHI Card Security:</strong> Anyone scanning this code sees only Tier 1 emergency crash data (blood group, severe allergies, chronic alerts, and ICE contacts). Full hospital ledgers remain locked behind verified clinician login.
               </div>
+            </div>
+            <div className="pt-2">
+              <WalletCardPrint
+                qrToken={passport.qr_token}
+                fullName={profile?.full_name ?? "Patient"}
+              />
             </div>
           </div>
         </section>
