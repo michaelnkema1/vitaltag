@@ -7,6 +7,8 @@ import {
   addIceContact,
 } from "@/lib/actions/passport";
 import { PassportQr } from "@/components/PassportQr";
+import { PharmacyHolds } from "@/components/PharmacyHolds";
+import { WalletCardPrint } from "@/components/WalletCardPrint";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import Link from "next/link";
@@ -20,14 +22,18 @@ import {
   Stethoscope,
   FileText,
   ChevronRight,
+  Eye,
+  CheckCircle2,
+  Clock,
+  Store,
 } from "lucide-react";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; hold_success?: string; hold_cancelled?: string }>;
 }) {
-  const { error: actionError } = await searchParams;
+  const { error: actionError, hold_success, hold_cancelled } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -147,20 +153,53 @@ export default async function DashboardPage({
     );
   }
 
-  const [{ data: allergies }, { data: conditions }, { data: contacts }] = await Promise.all([
+  // Parallel data fetching for passport sub-entities, pharmacies, holds, and audit logs
+  const [
+    { data: allergies },
+    { data: conditions },
+    { data: contacts },
+    { data: pharmacies },
+    { data: holds },
+    { data: auditLogs },
+  ] = await Promise.all([
     supabase.from("allergies").select("*").eq("passport_id", passport.id).order("created_at"),
     supabase.from("chronic_conditions").select("*").eq("passport_id", passport.id).order("created_at"),
     supabase.from("ice_contacts").select("*").eq("passport_id", passport.id).order("priority"),
+    supabase.from("pharmacies").select("*").order("name"),
+    supabase
+      .from("medication_holds")
+      .select("*, pharmacies(name, address, phone)")
+      .eq("passport_id", passport.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("access_audit_log")
+      .select("*")
+      .eq("passport_id", passport.id)
+      .order("accessed_at", { ascending: false })
+      .limit(10),
   ]);
 
   return (
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-4xl flex-1 space-y-8 px-6 py-12">
+        {/* Banners */}
         {actionError && (
           <div className="rounded-2xl bg-emergency-warn-bg p-4 text-sm text-emergency-fg flex items-center gap-2 border border-emergency-accent/30">
             <AlertTriangle className="h-4 w-4 shrink-0 text-emergency-accent" />
             <span>{actionError}</span>
+          </div>
+        )}
+        {hold_success && (
+          <div className="rounded-2xl bg-emerald-500/10 p-4 text-sm text-emerald-800 flex items-center gap-2 border border-emerald-500/30">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span>60-Minute Post-Triage Prescription Hold reserved successfully!</span>
+          </div>
+        )}
+        {hold_cancelled && (
+          <div className="rounded-2xl bg-foreground/5 p-4 text-sm text-foreground/70 flex items-center gap-2 border border-foreground/15">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-foreground/60" />
+            <span>Prescription hold cancelled.</span>
           </div>
         )}
 
@@ -176,6 +215,14 @@ export default async function DashboardPage({
           </div>
 
           <div className="flex items-center gap-3">
+            <WalletCardPrint
+              bloodGroup={passport.blood_group}
+              qrToken={passport.qr_token}
+              fullName={profile?.full_name ?? "Patient"}
+              allergies={allergies ?? []}
+              contacts={contacts ?? []}
+            />
+
             {isClinician && (
               <Link
                 href={`/terminal?token=${encodeURIComponent(passport.qr_token)}`}
@@ -282,6 +329,22 @@ export default async function DashboardPage({
             </div>
           </section>
         )}
+
+        {/* Module 4: Pharmacy Telemetry & Medication Holds */}
+        <section className="rounded-3xl border border-brand/15 bg-cream p-8 space-y-6">
+          <div className="flex items-center gap-2">
+            <Store className="h-5 w-5 text-brand" />
+            <h2 className="font-display text-xl font-semibold">
+              Pharmacy Telemetry & Prescription Holds
+            </h2>
+          </div>
+          <PharmacyHolds
+            passportId={passport.id}
+            pharmacies={pharmacies ?? []}
+            holds={(holds as unknown as Parameters<typeof PharmacyHolds>[0]["holds"]) ?? []}
+            redirectUrl="/dashboard"
+          />
+        </section>
 
         {/* Allergies Section */}
         <section className="rounded-3xl border border-brand/15 bg-background-elevated p-8 space-y-6">
@@ -417,6 +480,54 @@ export default async function DashboardPage({
               <Plus className="h-4 w-4" /> Add Contact
             </button>
           </form>
+        </section>
+
+        {/* Access Audit History Section */}
+        <section className="rounded-3xl border border-brand/15 bg-background-elevated p-8 space-y-4">
+          <div className="flex items-center gap-2">
+            <Eye className="h-5 w-5 text-brand" />
+            <div>
+              <h2 className="font-display text-xl font-semibold">Access & Security Audit Logs</h2>
+              <p className="text-xs text-brand/60">
+                Real-time security history recorded whenever your emergency passport is scanned
+              </p>
+            </div>
+          </div>
+
+          <div className="divide-y divide-brand/10 overflow-hidden rounded-2xl border border-brand/15 bg-cream">
+            {auditLogs?.map((log) => {
+              const accessedAt = new Date(log.accessed_at);
+              const meta = log.metadata as Record<string, unknown> | null;
+              const viaText = typeof meta?.via === "string" ? meta.via : "QR Scan";
+
+              return (
+                <div key={log.id} className="flex items-center justify-between p-4 text-xs">
+                  <div className="space-y-0.5">
+                    <span
+                      className={`inline-block rounded-full px-2 py-0.5 font-bold uppercase text-[0.6rem] ${
+                        log.tier === 1
+                          ? "bg-emergency-accent/20 text-emergency-accent"
+                          : "bg-brand/10 text-brand"
+                      }`}
+                    >
+                      Tier {log.tier} {log.tier === 1 ? "Emergency Scan" : "Hospital Ledger Scan"}
+                    </span>
+                    <p className="text-brand/80 font-medium">
+                      Accessed via {viaText}
+                    </p>
+                  </div>
+                  <span className="font-mono text-brand/60">
+                    {accessedAt.toLocaleDateString()} {accessedAt.toLocaleTimeString()}
+                  </span>
+                </div>
+              );
+            })}
+            {!auditLogs?.length && (
+              <div className="p-6 text-center text-xs text-brand/50">
+                No passport scan logs recorded yet.
+              </div>
+            )}
+          </div>
         </section>
       </main>
       <SiteFooter />

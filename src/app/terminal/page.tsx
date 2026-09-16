@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
 import { saveClinicalRecord } from "@/lib/actions/clinical";
 import { QrScanner } from "@/components/QrScanner";
+import { PharmacyHolds } from "@/components/PharmacyHolds";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import {
@@ -13,6 +14,7 @@ import {
   UserCheck,
   CheckCircle2,
   Stethoscope,
+  Store,
 } from "lucide-react";
 
 const isUuid = (str: string) =>
@@ -21,9 +23,16 @@ const isUuid = (str: string) =>
 export default async function TerminalPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string; med?: string; error?: string; saved?: string }>;
+  searchParams: Promise<{
+    token?: string;
+    med?: string;
+    error?: string;
+    saved?: string;
+    hold_success?: string;
+    hold_cancelled?: string;
+  }>;
 }) {
-  const { token, med, error: queryError, saved } = await searchParams;
+  const { token, med, error: queryError, saved, hold_success, hold_cancelled } = await searchParams;
   const supabase = await createClient();
   let searchError: string | null = queryError ?? null;
 
@@ -67,6 +76,8 @@ export default async function TerminalPage({
     doctor_notes: string | null;
   } | null = null;
   let contraindications: { substance: string; severity: string; reaction_notes: string | null }[] = [];
+  let pharmacies: { id: string; name: string; address: string; phone: string | null; lat: number; lng: number }[] = [];
+  let holds: unknown[] = [];
 
   const queryTerm = token?.trim();
 
@@ -116,20 +127,31 @@ export default async function TerminalPage({
       passport = p;
 
       if (passport) {
-        const [{ data: a }, { data: c }, { data: ic }, { data: cr }] = await Promise.all([
+        const [
+          { data: a },
+          { data: c },
+          { data: ic },
+          { data: cr },
+          { data: ph },
+          { data: mh },
+        ] = await Promise.all([
           supabase.from("allergies").select("*").eq("passport_id", passport.id),
           supabase.from("chronic_conditions").select("*").eq("passport_id", passport.id),
           supabase.from("ice_contacts").select("*").eq("passport_id", passport.id),
+          supabase.from("clinical_records").select("*").eq("passport_id", passport.id).maybeSingle(),
+          supabase.from("pharmacies").select("*").order("name"),
           supabase
-            .from("clinical_records")
-            .select("*")
+            .from("medication_holds")
+            .select("*, pharmacies(name, address, phone)")
             .eq("passport_id", passport.id)
-            .maybeSingle(),
+            .order("created_at", { ascending: false }),
         ]);
         allergies = a ?? [];
         conditions = c ?? [];
         contacts = ic ?? [];
         clinicalRecord = cr;
+        pharmacies = ph ?? [];
+        holds = mh ?? [];
 
         if (med) {
           const { data: flagged, error: rpcError } = await supabase.rpc("check_allergy_contraindication", {
@@ -155,6 +177,10 @@ export default async function TerminalPage({
   const existingPrescriptions = Array.isArray(clinicalRecord?.prescriptions)
     ? (clinicalRecord.prescriptions as string[]).join(", ")
     : "";
+
+  const currentRedirectUrl = passport
+    ? `/terminal?token=${encodeURIComponent(passport.qr_token)}`
+    : "/terminal";
 
   return (
     <>
@@ -195,6 +221,18 @@ export default async function TerminalPage({
           <div className="rounded-2xl bg-emerald-500/10 p-4 text-sm text-emerald-800 flex items-center gap-2 border border-emerald-500/30">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
             <span>Clinical record saved successfully.</span>
+          </div>
+        )}
+        {hold_success && (
+          <div className="rounded-2xl bg-emerald-500/10 p-4 text-sm text-emerald-800 flex items-center gap-2 border border-emerald-500/30">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span>Post-Triage 60-Minute Medication Hold placed successfully.</span>
+          </div>
+        )}
+        {hold_cancelled && (
+          <div className="rounded-2xl bg-foreground/5 p-4 text-sm text-foreground/70 flex items-center gap-2 border border-foreground/15">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-foreground/60" />
+            <span>Medication hold cancelled.</span>
           </div>
         )}
 
@@ -324,6 +362,22 @@ export default async function TerminalPage({
                   )}
                 </div>
               )}
+            </section>
+
+            {/* Module 4: Pharmacy Telemetry & Prescription Holds */}
+            <section className="rounded-3xl border border-brand/15 bg-cream p-8 space-y-6">
+              <div className="flex items-center gap-2">
+                <Store className="h-5 w-5 text-brand" />
+                <h3 className="font-display text-xl font-semibold">
+                  Dispensary Telemetry & Post-Triage Prescription Reservation
+                </h3>
+              </div>
+              <PharmacyHolds
+                passportId={passport.id}
+                pharmacies={pharmacies}
+                holds={(holds as unknown as Parameters<typeof PharmacyHolds>[0]["holds"])}
+                redirectUrl={currentRedirectUrl}
+              />
             </section>
 
             {/* Field Data Summaries */}
