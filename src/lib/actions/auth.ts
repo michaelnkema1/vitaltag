@@ -8,10 +8,15 @@ export async function signIn(formData: FormData) {
   const password = String(formData.get("password"));
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  }
+
+  // Ensure admin@vitaltag.demo has admin role in profiles table upon sign in
+  if (email.toLowerCase() === "admin@vitaltag.demo" && data?.user) {
+    await supabase.from("profiles").update({ role: "admin" }).eq("id", data.user.id);
   }
 
   // Redirect to dashboard where both patients and clinicians can view patient info,

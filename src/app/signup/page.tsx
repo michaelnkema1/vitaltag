@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signUp } from "@/lib/actions/auth";
+import { PasswordInput } from "@/components/PasswordInput";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
@@ -93,14 +94,7 @@ export default async function SignupPage({
             <label htmlFor="password" className="text-sm font-medium">
               Password
             </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              minLength={6}
-              className="w-full rounded-xl border border-brand/20 px-3 py-2.5"
-            />
+            <PasswordInput id="password" name="password" required minLength={6} />
           </div>
 
           <div className="space-y-1">

@@ -17,6 +17,7 @@ import {
   Plus,
   LogOut,
   ShieldCheck,
+  ShieldAlert,
   PhoneCall,
   Activity,
   Stethoscope,
@@ -226,6 +227,14 @@ export default async function DashboardPage({
                 className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-xs font-semibold text-cream transition hover:bg-brand-dark"
               >
                 <Stethoscope className="h-4 w-4" /> Hospital Terminal <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
+            {profile?.role === "admin" && (
+              <Link
+                href="/admin"
+                className="inline-flex items-center gap-2 rounded-full bg-emergency-accent px-4 py-2 text-xs font-semibold text-cream shadow-sm transition hover:bg-opacity-90"
+              >
+                <ShieldAlert className="h-4 w-4" /> Admin Portal
               </Link>
             )}
             <form action={signOut}>

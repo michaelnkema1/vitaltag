@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signIn } from "@/lib/actions/auth";
+import { PasswordInput } from "@/components/PasswordInput";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
@@ -49,13 +50,7 @@ export default async function LoginPage({
             <label htmlFor="password" className="text-sm font-medium">
               Password
             </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              className="w-full rounded-2xl border border-brand/20 px-4 py-2.5 text-sm"
-            />
+            <PasswordInput id="password" name="password" required />
           </div>
 
           <button

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
-import { Stethoscope, User, LogOut, ShieldCheck } from "lucide-react";
+import { Stethoscope, User, LogOut, ShieldCheck, ShieldAlert } from "lucide-react";
 
 export async function SiteHeader() {
   const supabase = await createClient();
@@ -20,6 +20,7 @@ export async function SiteHeader() {
   }
 
   const isClinician = profile?.role === "clinician" || profile?.role === "admin";
+  const isAdmin = profile?.role === "admin";
 
   return (
     <header className="sticky top-0 z-40 border-b border-brand/15 bg-cream/80 backdrop-blur-md">
@@ -53,6 +54,14 @@ export async function SiteHeader() {
               <Stethoscope className="h-4 w-4" /> Hospital Terminal
             </Link>
           )}
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-1.5 font-bold text-emergency-accent transition hover:opacity-80"
+            >
+              <ShieldAlert className="h-4 w-4" /> Admin Portal
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-3 text-sm">
@@ -72,12 +81,12 @@ export async function SiteHeader() {
                 </span>
               </div>
 
-              {isClinician && (
+              {isAdmin && (
                 <Link
-                  href="/terminal"
-                  className="rounded-full bg-brand px-3.5 py-1.5 text-xs font-semibold text-cream transition hover:bg-brand-dark sm:hidden"
+                  href="/admin"
+                  className="rounded-full bg-emergency-accent px-3 py-1 text-xs font-bold text-cream transition hover:bg-opacity-90 sm:hidden"
                 >
-                  Terminal
+                  Admin
                 </Link>
               )}
 
