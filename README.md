@@ -8,7 +8,7 @@ Full proposal spec: `VitalTag_Executive_Proposal_HatchPoint.docx`.
 
 ---
 
-## 🛠️ Stack
+## Stack
 
 * **Framework**: Next.js 16.3.5 (App Router, TypeScript)
 * **Database & Auth**: Supabase (PostgreSQL, Supabase Auth with `@supabase/ssr`, RLS policies, Realtime, PL/pgSQL RPCs)
@@ -17,7 +17,7 @@ Full proposal spec: `VitalTag_Executive_Proposal_HatchPoint.docx`.
 
 ---
 
-## 🔐 Access Model
+## Access Model
 
 | Access Tier | Target User | Authentication | Accessible Data & Capabilities |
 |---|---|---|---|
@@ -27,19 +27,19 @@ Full proposal spec: `VitalTag_Executive_Proposal_HatchPoint.docx`.
 
 ---
 
-## 🚀 Quick Demo Accounts
+## Quick Demo Accounts
 
 The database includes pre-seeded demo accounts for instant workflow evaluation (Password for all: `Password123!`):
 
 | Role | Email | Password | Details & Pre-loaded Data |
 |---|---|---|---|
-| 👑 **Admin Demo** | `admin@vitaltag.demo` | `Password123!` | Role: `admin` (System Administrator). Full access to `/admin` control portal, RBAC user role table, partner dispensary onboarding, and global security audit feed. |
-| 🩺 **Clinician Demo** | `clinician@vitaltag.demo` | `Password123!` | Role: `clinician` (Dr. Sarah Jenkins). Access to `/terminal` hospital triage, full clinical ledger editing, and contraindication engine. |
-| 👤 **Patient Demo** | `patient@vitaltag.demo` | `Password123!` | Role: `patient` (John Doe). Pre-loaded Blood Group `O+`, severe Penicillin allergy, Asthma, Diabetes, ICE contacts, 60-min pharmacy hold telemetry, zero-PHI printable card, and fixed QR Token: `11111111-1111-1111-1111-111111111111`. |
+| **Admin Demo** | `admin@vitaltag.demo` | `Password123!` | Role: `admin` (System Administrator). Full access to `/admin` control portal, RBAC user role table, partner dispensary onboarding, and global security audit feed. |
+| **Clinician Demo** | `clinician@vitaltag.demo` | `Password123!` | Role: `clinician` (Dr. Sarah Jenkins). Access to `/terminal` hospital triage, full clinical ledger editing, and contraindication engine. |
+| **Patient Demo** | `patient@vitaltag.demo` | `Password123!` | Role: `patient` (John Doe). Pre-loaded Blood Group `O+`, severe Penicillin allergy, Asthma, Diabetes, ICE contacts, 60-min pharmacy hold telemetry, zero-PHI printable card, and fixed QR Token: `11111111-1111-1111-1111-111111111111`. |
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
 1. **Environment Configuration**:
    Copy `.env.local.example` to `.env.local` and configure your Supabase URL & Anon Key:
@@ -65,7 +65,7 @@ The database includes pre-seeded demo accounts for instant workflow evaluation (
 
 ---
 
-## ✅ Feature Implementation Status
+## Feature Implementation Status
 
 - [x] **Zero-Data QR Ephemerality**: Physical cards contain strictly zero PHI — only cardholder full name and a random 128-bit UUID pointer token.
 - [x] **Zero-PHI Printable Wallet Cards**: Self-service printable card component (`WalletCardPrint.tsx`) accessible directly from Patient Dashboard (`/dashboard`).
@@ -85,7 +85,7 @@ The database includes pre-seeded demo accounts for instant workflow evaluation (
 
 ---
 
-## 📝 Conventions & Rules
+## Conventions & Rules
 
 - **Server Actions**: All mutations use Server Actions (`lib/actions/`), never API routes.
 - **Error Redirects**: Failures redirect to `?error=` query parameters to ensure visible UI feedback instead of silent form crashes.
