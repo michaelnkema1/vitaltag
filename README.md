@@ -90,3 +90,9 @@ The database includes pre-seeded demo accounts for instant workflow evaluation (
 - **Server Actions**: All mutations use Server Actions (`lib/actions/`), never API routes.
 - **Error Redirects**: Failures redirect to `?error=` query parameters to ensure visible UI feedback instead of silent form crashes.
 - **RLS Safety**: Never subquery `profiles` within its own policy — always use `SECURITY DEFINER` functions like `is_clinician()` to avoid Postgres recursion error `42P17`.
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](file:///home/mykecodes/Desktop/vitaltag/LICENSE) file for details.
