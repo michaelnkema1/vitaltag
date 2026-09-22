@@ -93,6 +93,19 @@ The database includes pre-seeded demo accounts for instant workflow evaluation (
 
 ---
 
+## Deployment (Vercel & Supabase)
+
+### Vercel Deployment (Frontend & Server Actions)
+1. Push your repository to GitHub.
+2. Import the repository into your **Vercel Dashboard**.
+3. In **Environment Variables**, add:
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://your-project-id.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `your-anon-key`
+   - `SUPABASE_SERVICE_ROLE_KEY` = `your-service-role-key` (optional, server-only)
+4. Click **Deploy**. Vercel will automatically run `npm run build` and provision serverless functions for Server Actions.
+
+---
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](file:///home/mykecodes/Desktop/vitaltag/LICENSE) file for details.
