@@ -66,14 +66,7 @@ export function WalletCardPrint({ qrToken, fullName }: WalletCardPrintProps) {
               </div>
 
               <div className="flex justify-center py-2">
-                <PassportQr token={qrToken} />
-              </div>
-
-              <div className="pt-2 border-t border-brand/15 flex items-center justify-center gap-1.5 text-xs text-brand/70">
-                <ShieldCheck className="h-4 w-4 text-brand shrink-0" />
-                <span className="text-[0.7rem] font-medium">
-                  Scan code in emergency for verified crash data
-                </span>
+                <PassportQr token={qrToken} showUrl={false} />
               </div>
             </div>
 
