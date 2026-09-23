@@ -28,6 +28,37 @@ export async function createPassport(formData: FormData) {
   const { supabase, userId } = await requireUserId();
   const blood_group = String(formData.get("blood_group")) as BloodGroup;
 
+  // Ensure profile row exists in public.profiles to satisfy passports_user_id_fkey foreign key constraint
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!profile) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const metaFullName = String(
+      user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User"
+    );
+    const metaRole = String(user?.user_metadata?.role || "patient") as any;
+
+    const { error: profileError } = await supabase.from("profiles").upsert(
+      {
+        id: userId,
+        full_name: metaFullName,
+        role: metaRole,
+      },
+      { onConflict: "id" }
+    );
+
+    if (profileError) {
+      failDashboard(`Profile initialization failed: ${profileError.message}`);
+    }
+  }
+
   const { error } = await supabase
     .from("passports")
     .insert({ user_id: userId, blood_group });
