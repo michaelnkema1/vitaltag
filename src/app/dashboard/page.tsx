@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
 import {
@@ -40,7 +41,9 @@ export default async function DashboardPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return null; // Middleware redirects unauthenticated users
+  if (!user) {
+    redirect("/login");
+  }
 
   let { data: profile } = await supabase
     .from("profiles")

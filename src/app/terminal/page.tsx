@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions/auth";
 import { saveClinicalRecord } from "@/lib/actions/clinical";
@@ -39,7 +40,9 @@ export default async function TerminalPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null; // Middleware redirects unauthenticated users
+  if (!user) {
+    redirect("/login");
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
