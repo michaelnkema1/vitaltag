@@ -45,7 +45,7 @@ export default async function TerminalPage({
     .from("profiles")
     .select("role, full_name")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (!profile || (profile.role !== "clinician" && profile.role !== "admin")) {
     return (

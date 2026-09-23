@@ -47,6 +47,14 @@ export async function signUp(formData: FormData) {
     redirect(`/signup?checkEmail=${encodeURIComponent(email)}`);
   }
 
+  if (data?.user) {
+    await supabase.from("profiles").upsert({
+      id: data.user.id,
+      full_name: fullName || (data.user.user_metadata?.full_name ?? "User"),
+      role: (role || data.user.user_metadata?.role || "patient") as any,
+    }, { onConflict: "id" });
+  }
+
   redirect("/dashboard");
 }
 

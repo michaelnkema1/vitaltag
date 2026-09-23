@@ -18,7 +18,7 @@ async function requireAdmin() {
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (!profile || profile.role !== "admin") {
     throw new Error("Unauthorized: Admin access required");

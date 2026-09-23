@@ -18,7 +18,7 @@ async function requireClinician() {
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (!profile || (profile.role !== "clinician" && profile.role !== "admin")) {
     throw new Error("Unauthorized: Clinician or Admin role required");

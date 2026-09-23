@@ -42,11 +42,27 @@ export default async function DashboardPage({
 
   if (!user) return null; // Middleware redirects unauthenticated users
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("role, full_name")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
+
+  if (!profile) {
+    const metaFullName = String(user.user_metadata?.full_name || user.email?.split("@")[0] || "User");
+    const metaRole = String(user.user_metadata?.role || "patient") as any;
+
+    await supabase.from("profiles").upsert(
+      {
+        id: user.id,
+        full_name: metaFullName,
+        role: metaRole,
+      },
+      { onConflict: "id" }
+    );
+
+    profile = { role: metaRole, full_name: metaFullName };
+  }
 
   const isClinician = profile?.role === "clinician" || profile?.role === "admin";
 

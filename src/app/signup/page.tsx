@@ -110,10 +110,6 @@ export default async function SignupPage({
               <option value="patient">Patient</option>
               <option value="clinician">Clinician (hospital terminal)</option>
             </select>
-            <p className="text-xs text-brand/50">
-              Demo only — in production, clinician accounts must be verified
-              and granted by an admin, not self-selected at signup.
-            </p>
           </div>
 
           <button
